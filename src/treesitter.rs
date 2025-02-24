@@ -2,27 +2,61 @@ use anyhow::{anyhow, Context, Result};
 use libloading::{Library, Symbol};
 use map_macro::hash_map;
 use regex::Regex;
-use std::fmt::Write;
+use std::{collections::HashMap, fmt::Write};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use tree_sitter::Language;
 use tree_sitter_highlight::{HighlightConfiguration, HighlightEvent, Highlighter};
+use once_cell::sync::Lazy;
 
 pub struct MdbookTreesitterHighlighter {
     highlighter: Highlighter,
     config: HighlightConfiguration,
 }
 
+#[derive(Clone)]
+struct LanguageConfig {
+    language: Language,
+    highlights: String,
+    injections: String,
+    locals: String,
+}
+
+static STATIC_LANGUAGES: Lazy<HashMap<String, LanguageConfig>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+
+    #[cfg(feature = "tree-sitter-fram")]
+    m.insert("fram".to_string(), LanguageConfig{
+        language: Language::new(tree_sitter_fram::LANGUAGE),
+        highlights: tree_sitter_fram::HIGHLIGHTS_QUERY.to_string(),
+        injections: String::new(),
+        locals: String::new(),
+    }
+    );
+    m
+});
+
+
 impl MdbookTreesitterHighlighter {
     pub fn new(codeblock_lang: &str) -> Result<Option<MdbookTreesitterHighlighter>> {
-        let language = MdbookTreesitterHighlighter::get_language(codeblock_lang)?;
 
-        let highlights_query = MdbookTreesitterHighlighter::load_scm(codeblock_lang, "highlights")?;
-        let injection_query =
-            MdbookTreesitterHighlighter::load_scm(codeblock_lang, "injections").unwrap_or_default();
-        let locals_query =
-            MdbookTreesitterHighlighter::load_scm(codeblock_lang, "locals").unwrap_or_default();
+        let (language, highlights_query, injection_query, locals_query) = 
+            match STATIC_LANGUAGES.get(codeblock_lang) {
+                Some(c) => {
+                    let c = c.clone();
+                    (c.language, c.highlights, c.injections, c.locals)
+                },
+                None => {
+                    let language = MdbookTreesitterHighlighter::get_language(codeblock_lang)?;
+                    let highlights_query = MdbookTreesitterHighlighter::load_scm(codeblock_lang, "highlights")?;
+                    let injection_query =
+                        MdbookTreesitterHighlighter::load_scm(codeblock_lang, "injections").unwrap_or_default();
+                    let locals_query =
+                        MdbookTreesitterHighlighter::load_scm(codeblock_lang, "locals").unwrap_or_default();
+                    (language, highlights_query, injection_query, locals_query)
+                }
+        };
 
         let mut config = HighlightConfiguration::new(
             language,

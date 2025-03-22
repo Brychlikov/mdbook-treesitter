@@ -962,7 +962,7 @@ dependencies = [
 [[package]]
 name = "tree-sitter-fram"
 version = "0.1.0"
-source = "git+https://github.com/Brychlikov/tree-sitter-fram.git#4b2fdf189048bf60333b2db9efdd39658d07330f"
+source = "git+https://github.com/Brychlikov/tree-sitter-fram.git#ad4f791fd01574f026fd7b7253ed9731253ee92e"
 dependencies = [
  "cc",
  "tree-sitter-language",
